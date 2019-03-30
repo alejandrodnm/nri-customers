@@ -37,7 +37,30 @@ packages:
 # Dependency packages to be pulled from upstream that are not in the resolver
 # using the same syntax as the packages field.
 # (e.g., acme-missiles-0.3)
-# extra-deps: []
+extra-deps:
+- process-1.6.4.0
+- persistent-2.9.0
+- persistent-postgresql-2.9.0
+- http-conduit-2.3.4
+- katip-0.7.0.0
+- monad-logger-0.3.30
+- text-1.2.3.1
+- servant-0.15
+- servant-server-0.15
+- wai-3.2.1.2
+- wai-extra-3.0.24.3
+- warp-3.2.25
+- aeson-1.4.2.0
+- transformers-0.5.6.2
+- mtl-2.2.2
+- containers-0.6.0.1
+- fast-logger-2.4.12
+- persistent-template-2.5.4
+- req-1.2.1
+- hspec-2.6.0
+- exceptions-0.10.0
+- bytestring-0.10.8.2
+- vector-0.12.0.2
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
