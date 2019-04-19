@@ -48,8 +48,8 @@ diracAPI = dirac
 
 dirac :: DiracRequest -> AppM Value
 dirac r = do
-    katipAddNamespace "diracs" $ logLocM DebugS (logStr $ query r)
-    return $ getDiracRestul' (pack $ query r)
+    katipAddNamespace "diracs" $ logLocM DebugS (logStr $ reqQuery r)
+    return $ getDiracRestul' (pack $ reqQuery r)
 
 getDiracRestul' :: Text -> Value
 getDiracRestul' query

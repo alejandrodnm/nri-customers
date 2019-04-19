@@ -23,6 +23,7 @@ import           Data.Aeson                     ( Value
                                                 , decode
                                                 , Value(Object, Array)
                                                 , (.:)
+                                                , (.:?)
                                                 )
 import           Data.Aeson.Types               ( Parser )
 import           Data.Maybe                     ( fromMaybe )
@@ -55,7 +56,36 @@ import           Control.Monad.IO.Class         ( MonadIO
                                                 , liftIO
                                                 )
 
-type Account = Integer
+newtype Account = Account {
+        accNumber :: Integer
+    } deriving(Generic, Show)
+
+instance ToJSON Account
+
+instance FromJSON Account where
+    parseJSON o = do
+        r <- responseResults o
+        Account <$> foldParsers (accountFromResults r <$> ["min", "max"])
+
+foldParsers :: (FromJSON b) => [Parser (Maybe b)] -> Parser b
+foldParsers []       = fail "none of the allowed functions attributes was found"
+foldParsers (p : ps) = p >>= maybe (foldParsers ps) return
+
+responseResults :: Value -> Parser (V.Vector Value)
+responseResults v = case v of
+    Object o -> do
+        r <- o .: "results"
+        case r of
+            Array v -> return v
+            _       -> fail "array of results expected"
+    _ -> fail "root object expected"
+
+accountFromResults :: (FromJSON b) => V.Vector Value -> Text -> Parser (Maybe b)
+accountFromResults v f = case length v of
+    0 -> fail "results array from query is empty"
+    _ -> case V.head v of
+        Object m -> m .:? f
+        _        -> fail "array of result objects expected"
 
 type ReqFormat = String
 
@@ -71,56 +101,22 @@ type Where = String
 type Since = String
 
 data DiracRequest = DiracRequest
-    { query :: String
-    , account :: Account
-    , format :: String
-    , jsonVersion :: Integer
-    , metadata :: DiracMetadata
+    { reqQuery :: String
+    , reqAccount :: Account
+    , reqFormat :: String
+    , reqJsonVersion :: Integer
+    , reqMetadata :: DiracMetadata
     } deriving(Generic, Show)
 
 instance ToJSON DiracRequest
 instance FromJSON DiracRequest
 
 newtype DiracMetadata = DiracMetadata
-    { source :: String
+    { dmSource :: String
     } deriving(Generic, Show)
 
 instance ToJSON DiracMetadata
 instance FromJSON DiracMetadata
-
-newtype MinResult = MinResult {
-    min :: Double
-    } deriving (Show, Generic)
-
-instance FromJSON MinResult where
-    parseJSON o = do
-        r <- diractResponseResults o
-        MinResult <$> attributeFromResults r "min"
-
-newtype MaxResult = MaxResult {
-    max :: Double
-    } deriving (Show, Generic)
-
-instance FromJSON MaxResult where
-    parseJSON o = do
-        r <- diractResponseResults o
-        MaxResult <$> attributeFromResults r "max"
-
-diractResponseResults :: Value -> Parser (V.Vector Value)
-diractResponseResults v = case v of
-    Object o -> do
-        r <- o .: "results"
-        case r of
-            Array v -> return v
-            _       -> fail "array of results expected"
-    _ -> fail "object expected"
-
-attributeFromResults :: (FromJSON b) => V.Vector Value -> Text -> Parser b
-attributeFromResults v f = case length v of
-    0 -> fail "results array from query is empty"
-    _ -> case V.head v of
-        Object m -> m .: f
-        _        -> fail "attribute from result not found"
 
 archiveQuery :: ArchiveFunction -> Query
 archiveQuery f =
@@ -141,11 +137,11 @@ encodeQuery (Query select from where' since) =
         ++ since
 
 requestBody :: Query -> DiracRequest
-requestBody q = DiracRequest { query       = encodeQuery q
-                             , account     = 313870
-                             , format      = "json"
-                             , jsonVersion = 1
-                             , metadata    = DiracMetadata "NRI-CUSTOMERS"
+requestBody q = DiracRequest { reqQuery       = encodeQuery q
+                             , reqAccount     = Account 313870
+                             , reqFormat      = "json"
+                             , reqJsonVersion = 1
+                             , reqMetadata    = DiracMetadata "NRI-CUSTOMERS"
                              }
 
 request
@@ -172,21 +168,26 @@ request body = do
             liftIO $ threadDelay 5000000
             request body
 
-nrqlPipeline
+getAccount
     :: (KatipContext m, MonadCatch m, MonadHttp m, MonadReader AppConfig m)
+    => ArchiveFunction
+    -> m Account
+getAccount f = do
+    -- Get the min and max account numbers
+    let query = archiveQuery f
+        body  = requestBody query
+    r <- request body
+    let account = responseBody r :: Account
+    return account
+
+nrqlPipeline
+    :: forall m
+     . (KatipContext m, MonadCatch m, MonadHttp m, MonadReader AppConfig m)
     => m ()
 nrqlPipeline = do
-    -- Get the min and max account numbers
-    let queryMin     = archiveQuery Min
-        queryMinbody = requestBody queryMin
-    minR <- request queryMinbody
-    let minAcc = responseBody minR :: MinResult
-    liftIO $ threadDelay 1000000
 
-    let queryMax     = archiveQuery Max
-        queryMaxbody = requestBody queryMax
-    maxR <- request queryMaxbody
-    let maxAcc = responseBody maxR :: MaxResult
+    a <- getAccount Min
+    liftIO $ print a
     liftIO $ threadDelay 1000000
 
     return ()
