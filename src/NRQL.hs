@@ -1,60 +1,35 @@
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveGeneric       #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveGeneric #-}
 
 module NRQL where
 
-import           Control.Concurrent             ( threadDelay )
-import           Control.Monad.Catch            ( catch
-                                                , MonadCatch
-                                                , try
-                                                , SomeException
-                                                )
-import           Data.ByteString                ( ByteString )
-import           Data.Typeable                  ( typeOf )
-import           Data.Either                    ( Either(..) )
-import           Data.Aeson                     ( Value
-                                                , FromJSON(..)
-                                                , ToJSON
-                                                , FromJSON
-                                                , encode
-                                                , decode
-                                                , Value(Object, Array)
-                                                , (.:)
-                                                , (.:?)
-                                                )
-import           Data.Aeson.Types               ( Parser )
-import           Data.Maybe                     ( fromMaybe )
-import           Data.Text                      ( Text )
-import qualified Data.Vector                   as V
-import           Data.List                      ( head )
-import           Config                         ( cfgNREndpoint
-                                                , AppConfig
-                                                )
-import           Control.Monad.Reader           ( asks
-                                                , MonadReader
-                                                )
-import           Logger                         ( logLocM
-                                                , logStr
-                                                , Severity(..)
-                                                , KatipContext
-                                                )
-import           Network.HTTP.Req               ( parseUrlHttp
-                                                , HttpResponseBody
-                                                , JsonResponse
-                                                , MonadHttp
-                                                , req
-                                                , POST(POST)
-                                                , ReqBodyJson(ReqBodyJson)
-                                                , jsonResponse
-                                                , responseBody
-                                                )
-import           GHC.Generics                   ( Generic )
-import           Control.Monad.IO.Class         ( MonadIO
-                                                , liftIO
-                                                )
+import           Config                 (AppConfig, cfgNREndpoint)
+import           Control.Concurrent     (threadDelay)
+import           Control.Monad.Catch    (MonadCatch, SomeException, catch, try)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad.Reader   (MonadReader, asks)
+import           Data.Aeson             (FromJSON (..), ToJSON, Value,
+                                         Value (Array, Object), decode, encode,
+                                         (.:), (.:?))
+import           Data.Aeson.Types       (Parser)
+import           Data.ByteString        (ByteString)
+import           Data.Either            (Either (..))
+import           Data.List              (head)
+import           Data.Maybe             (fromMaybe)
+import           Data.Text              (Text)
+import           Data.Typeable          (typeOf)
+import qualified Data.Vector            as V
+import           GHC.Generics           (Generic)
+import           Logger                 (KatipContext, Severity (..), logLocM,
+                                         logStr)
+import           Network.HTTP.Req       (HttpResponseBody, JsonResponse,
+                                         MonadHttp, POST (POST),
+                                         ReqBodyJson (ReqBodyJson),
+                                         jsonResponse, parseUrlHttp, req,
+                                         responseBody)
 
 newtype Account = Account {
         accNumber :: Integer
@@ -67,10 +42,12 @@ instance FromJSON Account where
         r <- responseResults o
         Account <$> foldParsers (accountFromResults r <$> ["min", "max"])
 
+-- Returns the first valid parser, is no parser is valid, it fails.
 foldParsers :: (FromJSON b) => [Parser (Maybe b)] -> Parser b
 foldParsers []       = fail "none of the allowed functions attributes was found"
 foldParsers (p : ps) = p >>= maybe (foldParsers ps) return
 
+-- Returns a parser up to the `results` attribute of the response
 responseResults :: Value -> Parser (V.Vector Value)
 responseResults v = case v of
     Object o -> do
@@ -92,6 +69,7 @@ type ReqFormat = String
 data ArchiveFunction
     = Min
     | Max
+    | Uniques
 
 data Query = Query Select From Where Since deriving (Show)
 
@@ -101,11 +79,11 @@ type Where = String
 type Since = String
 
 data DiracRequest = DiracRequest
-    { reqQuery :: String
-    , reqAccount :: Account
-    , reqFormat :: String
+    { reqQuery       :: String
+    , reqAccount     :: Account
+    , reqFormat      :: String
     , reqJsonVersion :: Integer
-    , reqMetadata :: DiracMetadata
+    , reqMetadata    :: DiracMetadata
     } deriving(Generic, Show)
 
 instance ToJSON DiracRequest
@@ -118,8 +96,8 @@ newtype DiracMetadata = DiracMetadata
 instance ToJSON DiracMetadata
 instance FromJSON DiracMetadata
 
-archiveQuery :: ArchiveFunction -> Query
-archiveQuery f =
+retrieveAccountQuery :: ArchiveFunction -> Query
+retrieveAccountQuery f =
     let f' = case f of
             Min -> "min(account)"
             Max -> "max(account)"
@@ -144,16 +122,17 @@ requestBody q = DiracRequest { reqQuery       = encodeQuery q
                              , reqMetadata    = DiracMetadata "NRI-CUSTOMERS"
                              }
 
+-- Executes a request with the given `DiracRequest`, in case of and
+-- error the request will be retried.
 request
-    :: forall m a b
+    :: forall m b
      . ( KatipContext m
        , MonadReader AppConfig m
        , MonadHttp m
        , MonadCatch m
-       , ToJSON a
        , FromJSON b
        )
-    => a
+    => DiracRequest
     -> m (JsonResponse b)
 request body = do
     (url, options) <- asks cfgNREndpoint
@@ -164,30 +143,19 @@ request body = do
         Right v -> return v
         Left  e -> do
             liftIO $ print e
-            logLocM WarningS ((logStr . show) e)
+            logLocM ErrorS ((logStr . show) e)
             liftIO $ threadDelay 5000000
             request body
 
+-- Retrieves the account resulting from applying the given function
 getAccount
     :: (KatipContext m, MonadCatch m, MonadHttp m, MonadReader AppConfig m)
     => ArchiveFunction
     -> m Account
 getAccount f = do
     -- Get the min and max account numbers
-    let query = archiveQuery f
+    let query = retrieveAccountQuery f
         body  = requestBody query
     r <- request body
     let account = responseBody r :: Account
     return account
-
-nrqlPipeline
-    :: forall m
-     . (KatipContext m, MonadCatch m, MonadHttp m, MonadReader AppConfig m)
-    => m ()
-nrqlPipeline = do
-
-    a <- getAccount Min
-    liftIO $ print a
-    liftIO $ threadDelay 1000000
-
-    return ()
