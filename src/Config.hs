@@ -98,7 +98,15 @@ data AppConfig = AppConfig
 -- | This type represents the effect for the daemon application
 newtype DaemonT m a = DaemonT
     { runDaemonT :: ReaderT AppConfig m a
-    } deriving (Functor, Applicative, Monad, MonadIO, MonadReader AppConfig, MonadThrow, MonadCatch)
+    } deriving
+        ( Functor
+        , Applicative
+        , Monad
+        , MonadIO
+        , MonadReader AppConfig
+        , MonadThrow
+        , MonadCatch
+        )
 
 instance MonadIO m => Katip (DaemonT m)  where
     getLogEnv   = asks cfgLogEnv

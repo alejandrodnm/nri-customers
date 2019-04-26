@@ -6,6 +6,9 @@ author:              "Author name here"
 maintainer:          "example@example.com"
 copyright:           "2018 Author name here"
 
+default-extensions:
+  - OverloadedStrings
+
 extra-source-files:
 - README.md
 - ChangeLog.md

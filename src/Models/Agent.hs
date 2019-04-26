@@ -13,9 +13,13 @@
 
 module Models.Agent where
 
-import           Data.Text           (Text)
-import           Database.Persist.TH (mkMigrate, mkPersist, persistLowerCase,
-                                      persistLowerCase, share, sqlSettings)
+import           Data.Text                      ( Text )
+import           Database.Persist.TH            ( mkMigrate
+                                                , mkPersist
+                                                , persistLowerCase
+                                                , share
+                                                , sqlSettings
+                                                )
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     Agent json
