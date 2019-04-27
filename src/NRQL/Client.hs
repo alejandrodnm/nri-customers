@@ -53,7 +53,7 @@ import           Types.Host                     ( Host(..)
                                                 , HostsCount(..)
                                                 )
 
-nrqlLimit = 1000
+nrqlLimit = 5
 
 type ReqFormat = String
 
@@ -104,14 +104,14 @@ accountsQuery bottom top =
 
 accountHostsCountQuery :: Query
 accountHostsCountQuery =
-    Query "uniqueCount(entityId)" "SystemSample" "" "1 week ago"
+    Query "uniqueCount(entityId)" "SystemSample" "true" "1 week ago"
 
 accountHostsQuery :: Query
 accountHostsQuery =
     let
         select
-            = "latest(entityId), latest(linuxDistribution), latest(agentVersion), latest(kernelVersion), latest(instanceType), latest(operatingSystem), latest(windowsVersion), latest(windowsPlatform), latest(windowsFamily), latest(coreCount), latest(processorCount), latest(systemMemoryBytes)"
-    in  Query select "SystemSample" "" "1 week ago"
+            = "latest(linuxDistribution), latest(agentVersion), latest(kernelVersion), latest(instanceType), latest(operatingSystem), latest(windowsVersion), latest(windowsPlatform), latest(windowsFamily), latest(coreCount), latest(processorCount), latest(systemMemoryBytes)"
+    in  Query select "SystemSample" "true facet entityId" "1 week ago"
 encodeQuery :: Query -> String
 encodeQuery (Query select from where' since) =
     "select "
@@ -122,6 +122,7 @@ encodeQuery (Query select from where' since) =
         ++ where'
         ++ " since "
         ++ since
+        ++ " limit 5"
 
 metaAccount :: Account
 metaAccount = Account 313870
@@ -204,7 +205,8 @@ getHosts
 getHosts acc = do
     let body = requestBody accountHostsQuery acc
     r <- request body
-    let hosts = responseBody r :: Hosts
-    return hosts
-
--- SELECT latest(entityId), latest(linuxDistribution), latest(agentVersion), latest(kernelVersion), latest(instanceType), latest(operatingSystem), latest(windowsVersion), latest(windowsPlatform), latest(windowsFamily), latest(coreCount), latest(processorCount), latest(systemMemoryBytes) FROM SystemSample facet entityId LIMIT 2 SINCE 1 week ago
+    let hosts     = responseBody r :: Hosts
+        accountId = fromInteger $ accNumber acc :: Int
+        addAccount :: Host -> Host
+        addAccount h = h { hostAccount = Just accountId }
+    return $ Hosts (addAccount <$> hList hosts)

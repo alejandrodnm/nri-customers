@@ -12,7 +12,7 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE DataKinds         #-}
 
-module Models.Account where
+module Models.Host where
 
 import           Data.Text                      ( Text )
 import           Database.Persist.TH            ( mkMigrate
@@ -37,5 +37,6 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
         coreCount         Int Maybe
         processorCount    Int Maybe
         systemMemoryBytes Int Maybe
+        account         Int Maybe
         deriving Show Eq
 |]

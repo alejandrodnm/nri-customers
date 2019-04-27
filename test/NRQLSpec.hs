@@ -56,6 +56,7 @@ spec = do
                         (Just 14)
                         (Just 56)
                         (Just 269033377792)
+                        Nothing
                   )
 
     it "decode hosts"
@@ -76,6 +77,7 @@ spec = do
                              (Just 14)
                              (Just 56)
                              (Just 269033377792)
+                             Nothing
                       , Host
                           "8923018336323236291"
                           (Just "ContainerLinuxbyCoreOS1911.5.0(Rhyolite)")
@@ -89,5 +91,6 @@ spec = do
                           (Just 18)
                           (Just 72)
                           (Just 404430925824)
+                          Nothing
                       ]
                   )

@@ -21,7 +21,7 @@ import           Data.Monoid                    ( Sum(..)
 import qualified Data.Vector                   as V
 import           Text.Read                      ( readMaybe )
 
-import           Models.Account                 ( Host(Host) )
+import           Models.Host                    ( Host(..) )
 import           NRQL.Aeson                     ( foldParsers
                                                 , responseResults
                                                 , accountFromResults
@@ -58,6 +58,7 @@ instance FromJSON Host where
                     <*> toInt (getLatestFromResult v 8)
                     <*> toInt (getLatestFromResult v 9)
                     <*> toInt (getLatestFromResult v 10)
+                    <*> parserNothing
             _ -> fail "array of results expected"
       where
         toInt :: Parser (Maybe String) -> Parser (Maybe Int)
@@ -65,6 +66,9 @@ instance FromJSON Host where
             ( ((fmap getSum . fold) . (fmap . fmap) Sum)
             . fmap (readMaybe :: String -> Maybe Int)
             )
+        parserNothing :: Parser (Maybe Int)
+        parserNothing = return Nothing
+
 
 getLatestFromResult :: FromJSON a => V.Vector Value -> Int -> Parser (Maybe a)
 getLatestFromResult v i = case v V.!? i of
