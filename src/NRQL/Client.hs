@@ -140,7 +140,7 @@ encodeQuery (Query select from where' since) =
         ++ " since "
         ++ since
         ++ " limit "
-        ++ (show nrqlLimit)
+        ++ show nrqlLimit
 
 metaAccount :: Account
 metaAccount = Account 313870

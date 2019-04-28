@@ -46,13 +46,14 @@ import           Types.Host                     ( Hosts(hList)
                                                 )
 
 daemonLoop :: DaemonT IO ()
-daemonLoop = forever $ do
-    liftIO $ threadDelay 5000000
-    -- FIXME This leaks namespaces
-    katipAddNamespace "daemon" pipeline
+daemonLoop = katipAddNamespace "daemon" $ forever $ do
+    pipeline
+    liftIO $ threadDelay week
 
 wait :: DaemonT IO ()
-wait = liftIO $ threadDelay 3000000
+wait = liftIO $ threadDelay week
+
+week = 7 * 24 * 3600 * 1000000
 
 pipeline :: DaemonT IO ()
 pipeline = do
