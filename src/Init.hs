@@ -6,28 +6,17 @@ module Init
     )
 where
 
-import           Api                            ( app )
-import           Config                         ( AppConfig(..)
-                                                , Environment(..)
-                                                , makeDBPool
-                                                , DaemonT(runDaemonT)
-                                                )
 import           Control.Concurrent             ( forkIO )
 import           Control.Exception              ( bracket )
 import           Control.Monad.Reader           ( runReaderT )
 import           Daemon                         ( daemonLoop )
 import           Data.ByteString                ( ByteString )
+import           Data.ByteString.Char8          ( pack )
+import           Data.Maybe                     ( fromMaybe )
 import           Network.HTTP.Req               ( parseUrlHttp
                                                 , Url
                                                 , Option
                                                 , Scheme(Http)
-                                                )
-import           Data.ByteString.Char8          ( pack )
-import           Logger                         ( LogEnv
-                                                , defaultLogEnv
-                                                , logCleanup
-                                                , runLoggerWithMsg
-                                                , waiLogMiddleware
                                                 )
 import           Network.Wai.Handler.Warp       ( Port
                                                 , Settings
@@ -36,9 +25,22 @@ import           Network.Wai.Handler.Warp       ( Port
                                                 , setHost
                                                 , setPort
                                                 )
-import           Persist                        ( migrate )
 import           Safe                           ( readMay )
 import           System.Environment             ( lookupEnv )
+
+import           Api                            ( app )
+import           Config                         ( AppConfig(..)
+                                                , Environment(..)
+                                                , makeDBPool
+                                                , DaemonT(runDaemonT)
+                                                )
+import           Logger                         ( LogEnv
+                                                , defaultLogEnv
+                                                , logCleanup
+                                                , runLoggerWithMsg
+                                                , waiLogMiddleware
+                                                )
+import           Persist                        ( migrate )
 
 
 -- | Returns a default warp settings but with localhost as host
@@ -77,7 +79,8 @@ getConfig = do
                      }
 
 parseURL :: String -> (Url Http, Option b)
-parseURL url = maybe (handleFailedParse url) id (parseUrlHttp $ pack url)
+-- FIXME fromMaybe
+parseURL url = fromMaybe (handleFailedParse url) (parseUrlHttp $ pack url)
   where
     handleFailedParse url = error $ "Failed to parse url [[" ++ url ++ "]]"
 

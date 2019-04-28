@@ -24,7 +24,7 @@ instance FromJSON Accounts where
         return $ Accounts (Account <$> rawAccounts)
 
 newtype Account = Account {
-        accNumber :: Integer
+        accNumber :: Int
     } deriving(Show, Eq, Ord)
 
 instance ToJSON Account where

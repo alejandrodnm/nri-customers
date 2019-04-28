@@ -1,7 +1,9 @@
 module Types.Host
     ( Hosts(..)
     , Host(..)
+    , PartialHost(..)
     , HostsCount(..)
+    , hostFromPartial
     )
 where
 
@@ -14,39 +16,57 @@ import           Data.Aeson                     ( FromJSON(..)
                                                 )
 import           Data.Aeson.Types               ( Parser )
 import           Data.Foldable                  ( fold )
-import           Data.Traversable               ( sequenceA )
 import           Data.Monoid                    ( Sum(..)
                                                 , getSum
                                                 )
+import           Data.Text                      ( Text )
+import Data.Time.Clock (UTCTime)
+import           Data.Traversable               ( sequenceA )
 import qualified Data.Vector                   as V
 import           Text.Read                      ( readMaybe )
 
 import           Models.Host                    ( Host(..) )
+import           Types.Account                  ( Account(..) )
 import           NRQL.Aeson                     ( foldParsers
                                                 , responseResults
                                                 , accountFromResults
                                                 )
 
 newtype Hosts = Hosts {
-        hList :: [Host]
+        hList :: [PartialHost]
     } deriving(Show, Eq)
+
+data PartialHost = PartialHost
+    { entityId :: Text
+    , linuxDistribution :: Maybe String
+    , agentVersion      ::  Maybe String
+    , kernelVersion     ::  Maybe String
+    , instanceType      ::  Maybe String
+    , operatingSystem   ::  Maybe String
+    , windowsVersion    ::  Maybe String
+    , windowsPlatform   ::  Maybe String
+    , windowsFamily     ::  Maybe String
+    , coreCount         :: Maybe Int
+    , processorCount    :: Maybe Int
+    , systemMemoryBytes :: Maybe Int
+    } deriving(Show, Eq)
+
 
 instance FromJSON Hosts where
     parseJSON (Object o) = do
         f <- o .: "facets"
         case f of
-            Array v ->
-                Hosts <$> sequenceA
-                    ((parseJSON :: Value -> Parser Host) <$> V.toList v)
+            Array v -> Hosts <$> sequenceA
+                ((parseJSON :: Value -> Parser PartialHost) <$> V.toList v)
 
             _ -> fail "array of results expected"
 
-instance FromJSON Host where
+instance FromJSON PartialHost where
     parseJSON (Object o) = do
         r <- o .: "results"
         case r of
             Array v ->
-                (Host <$> (o .: "name"))
+                (PartialHost <$> (o .: "name"))
                     <*> getLatestFromResult v 0
                     <*> getLatestFromResult v 1
                     <*> getLatestFromResult v 2
@@ -58,7 +78,6 @@ instance FromJSON Host where
                     <*> toInt (getLatestFromResult v 8)
                     <*> toInt (getLatestFromResult v 9)
                     <*> toInt (getLatestFromResult v 10)
-                    <*> parserNothing
             _ -> fail "array of results expected"
       where
         toInt :: Parser (Maybe String) -> Parser (Maybe Int)
@@ -66,9 +85,6 @@ instance FromJSON Host where
             ( ((fmap getSum . fold) . (fmap . fmap) Sum)
             . fmap (readMaybe :: String -> Maybe Int)
             )
-        parserNothing :: Parser (Maybe Int)
-        parserNothing = return Nothing
-
 
 getLatestFromResult :: FromJSON a => V.Vector Value -> Int -> Parser (Maybe a)
 getLatestFromResult v i = case v V.!? i of
@@ -78,10 +94,27 @@ getLatestFromResult v i = case v V.!? i of
     Nothing -> fail "results index out of bound"
 
 newtype HostsCount = HostsCount {
-        hCount :: Integer
+        hCount :: Int
     } deriving(Show, Eq)
 
 instance FromJSON HostsCount where
     parseJSON o = do
         r <- responseResults o
         HostsCount <$> foldParsers (accountFromResults r <$> ["uniqueCount"])
+
+hostFromPartial :: Account -> UTCTime -> PartialHost -> Host
+hostFromPartial a time ph = Host { hostEntityId          = entityId ph
+                            , hostAccount           = accNumber a
+                            , hostLinuxDistribution = linuxDistribution ph
+                            , hostAgentVersion      = agentVersion ph
+                            , hostKernelVersion     = kernelVersion ph
+                            , hostInstanceType      = instanceType ph
+                            , hostOperatingSystem   = operatingSystem ph
+                            , hostWindowsVersion    = windowsVersion ph
+                            , hostWindowsPlatform   = windowsPlatform ph
+                            , hostWindowsFamily     = windowsFamily ph
+                            , hostCoreCount         = coreCount ph
+                            , hostProcessorCount    = processorCount ph
+                            , hostSystemMemoryBytes = systemMemoryBytes ph
+                            , hostCreated           = time
+                            }

@@ -43,20 +43,19 @@ spec = do
         $ let
               rawHost
                   = "{\"name\":\"974205676942181148\",\"results\":[{\"latest\":\"CentOSLinux7(Core)\"},{\"latest\":\"1.3.20\"},{\"latest\":\"3.10.0-514.21.1.el7.x86_64\"},{\"latest\":\"unknown\"},{\"latest\":\"linux\"},{\"latest\":null},{\"latest\":null},{\"latest\":null},{\"latest\":\"14\"},{\"latest\":\"56\"},{\"latest\":\"269033377792\"}]}"
-          in  (decode rawHost :: Maybe Host) `shouldBe` Just
-                  (Host "974205676942181148"
-                        (Just "CentOSLinux7(Core)")
-                        (Just "1.3.20")
-                        (Just "3.10.0-514.21.1.el7.x86_64")
-                        (Just "unknown")
-                        (Just "linux")
-                        Nothing
-                        Nothing
-                        Nothing
-                        (Just 14)
-                        (Just 56)
-                        (Just 269033377792)
-                        Nothing
+          in  (decode rawHost :: Maybe PartialHost) `shouldBe` Just
+                  (PartialHost "974205676942181148"
+                               (Just "CentOSLinux7(Core)")
+                               (Just "1.3.20")
+                               (Just "3.10.0-514.21.1.el7.x86_64")
+                               (Just "unknown")
+                               (Just "linux")
+                               Nothing
+                               Nothing
+                               Nothing
+                               (Just 14)
+                               (Just 56)
+                               (Just 269033377792)
                   )
 
     it "decode hosts"
@@ -65,20 +64,19 @@ spec = do
                   = "{\"facets\":[{\"name\":\"974205676942181148\",\"results\":[{\"latest\":\"CentOSLinux7(Core)\"},{\"latest\":\"1.3.20\"},{\"latest\":\"3.10.0-514.21.1.el7.x86_64\"},{\"latest\":\"unknown\"},{\"latest\":\"linux\"},{\"latest\":null},{\"latest\":null},{\"latest\":null},{\"latest\":\"14\"},{\"latest\":\"56\"},{\"latest\":\"269033377792\"}]},{\"name\":\"8923018336323236291\",\"results\":[{\"latest\":\"ContainerLinuxbyCoreOS1911.5.0(Rhyolite)\"},{\"latest\":\"1.0.1019\"},{\"latest\":\"4.14.84-coreos\"},{\"latest\":\"SupermicroSYS-6019U-TN4R4T\"},{\"latest\":\"linux\"},{\"latest\":null},{\"latest\":null},{\"latest\":null},{\"latest\":\"18\"},{\"latest\":\"72\"},{\"latest\":\"404430925824\"}]}]}"
           in  (decode rawHosts :: Maybe Hosts) `shouldBe` Just
                   (Hosts
-                      [ Host "974205676942181148"
-                             (Just "CentOSLinux7(Core)")
-                             (Just "1.3.20")
-                             (Just "3.10.0-514.21.1.el7.x86_64")
-                             (Just "unknown")
-                             (Just "linux")
-                             Nothing
-                             Nothing
-                             Nothing
-                             (Just 14)
-                             (Just 56)
-                             (Just 269033377792)
-                             Nothing
-                      , Host
+                      [ PartialHost "974205676942181148"
+                                    (Just "CentOSLinux7(Core)")
+                                    (Just "1.3.20")
+                                    (Just "3.10.0-514.21.1.el7.x86_64")
+                                    (Just "unknown")
+                                    (Just "linux")
+                                    Nothing
+                                    Nothing
+                                    Nothing
+                                    (Just 14)
+                                    (Just 56)
+                                    (Just 269033377792)
+                      , PartialHost
                           "8923018336323236291"
                           (Just "ContainerLinuxbyCoreOS1911.5.0(Rhyolite)")
                           (Just "1.0.1019")
@@ -91,6 +89,5 @@ spec = do
                           (Just 18)
                           (Just 72)
                           (Just 404430925824)
-                          Nothing
                       ]
                   )

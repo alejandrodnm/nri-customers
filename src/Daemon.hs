@@ -13,14 +13,11 @@ import           Control.Monad.IO.Class         ( MonadIO
                                                 , liftIO
                                                 )
 import           Data.Maybe                     ( fromJust )
-import           Database.Persist.Class         ( insertMany )
-import           NRQL.Client                    ( ArchiveFunction(..)
-                                                , getAccount
-                                                , getAccountHostsCount
-                                                , getAccounts
-                                                , getHosts
-                                                , nrqlLimit
+import           Data.Time.Clock                ( UTCTime
+                                                , getCurrentTime
                                                 )
+import           Database.Persist.Class         ( insertMany )
+import           Database.Persist.Types         ( Key )
 
 import           Config                         ( DaemonT )
 import           Logger                         ( Severity(..)
@@ -28,17 +25,30 @@ import           Logger                         ( Severity(..)
                                                 , logLocM
                                                 , logStr
                                                 )
+import           NRQL.Client                    ( ArchiveFunction(..)
+                                                , getAccount
+                                                , getHostsCount
+                                                , hostsCountQueryFilteredByEntity
+                                                , hostsCountQuery
+                                                , hostsQueryFilteredByEntity
+                                                , hostsQuery
+                                                , getAccounts
+                                                , getHosts
+                                                , nrqlLimit
+                                                )
+import           Persist                        ( runDB )
 import           Types.Account                  ( Account(..)
                                                 , Accounts(..)
                                                 )
-import           Types.Host                     ( Hosts(hList) )
-import           Persist                        ( runDB )
+import           Types.Host                     ( Hosts(hList)
+                                                , Host
+                                                , hostFromPartial
+                                                )
 
-
-accountStep = 1000
 daemonLoop :: DaemonT IO ()
 daemonLoop = forever $ do
     liftIO $ threadDelay 5000000
+    -- FIXME This leaks namespaces
     katipAddNamespace "daemon" pipeline
 
 wait :: DaemonT IO ()
@@ -55,14 +65,15 @@ pipeline = do
     logLocM DebugS (logStr $ "max account retrieved: " ++ show maxAccount)
     wait
 
-    processAccounts maxAccount minAccount
+    time <- liftIO getCurrentTime
+    processAccounts maxAccount minAccount time
     return ()
 
 nextTop :: Account -> Account
 nextTop account = Account (accNumber account + nrqlLimit)
 
-processAccounts :: Account -> Account -> DaemonT IO ()
-processAccounts max bottom = do
+processAccounts :: Account -> Account -> UTCTime -> DaemonT IO ()
+processAccounts max bottom time = do
     let top = nextTop bottom
     logLocM
         DebugS
@@ -70,18 +81,68 @@ processAccounts max bottom = do
         )
     accounts <- getAccounts bottom top
     wait
-    processAccountHosts accounts
-    when (top < max) $ processAccounts max top
+    processAccountHosts time accounts
+    when (top < max) $ processAccounts max top time
 
-processAccountHosts :: Accounts -> DaemonT IO ()
-processAccountHosts (Accounts []      ) = return ()
-processAccountHosts (Accounts (a : as)) = do
-    hostsCount <- getAccountHostsCount a
+processAccountHosts :: UTCTime -> Accounts -> DaemonT IO ()
+processAccountHosts _    (Accounts []      ) = return ()
+processAccountHosts time (Accounts (a : as)) = do
+    hostsCount <- getHostsCount a hostsCountQuery
     wait
-    -- if hostsCount <= 1000 then getHosts a else return ()
-    hosts <- getHosts a
-    wait
-    runDB (insertMany $ hList hosts)
-    processAccountHosts (Accounts as)
+    case () of
+        _
+            | hostsCount > 0 && hostsCount <= nrqlLimit -> do
+                partialHosts <- getHosts a hostsQuery
+                wait
+                persistHosts a time partialHosts
+                return hostsCount
+            | hostsCount > nrqlLimit -> processAccountHostsPagination
+                a
+                time
+                hostsCount
+            | otherwise -> return hostsCount
+    processAccountHosts time (Accounts as)
 
--- λ ➜ curl -v -H 'Accept: application/json' -H "Content-Type: application/json" --data "{\"jsonVersion\":1,\"query\":\"SELECT latest(entityId), latest(linuxDistribution), latest(agentVersion), latest(kernelVersion), latest(instanceType), latest(operatingSystem), latest(windowsVersion), latest(windowsPlatform), latest(windowsFamily), latest(coreCount), latest(processorCount), latest(systemMemoryBytes) FROM SystemSample facet entityId LIMIT 10 SINCE 1 week ago\",\"metadata\":{\"source\":\"NRI-CUSTOMERS\"},\"account\":1,\"format\":\"json\"}" http://dirac.nr-ops.net:8084/api/1/query | jq .
+persistHosts :: Account -> UTCTime -> Hosts -> DaemonT IO [Key Host]
+persistHosts a time partialHosts = do
+    let hosts = hostFromPartial a time <$> hList partialHosts
+    runDB (insertMany hosts)
+
+processAccountHostsPagination :: Account -> UTCTime -> Int -> DaemonT IO Int
+processAccountHostsPagination a time total =
+    processAccountHostsPagination' a time total 0 "" 1
+
+processAccountHostsPagination'
+    :: Account -> UTCTime -> Int -> Int -> String -> Int -> DaemonT IO Int
+processAccountHostsPagination' a time total totalAcc partialEntity i
+    | totalAcc >= total = return totalAcc
+    | i >= 10 = return totalAcc
+    | otherwise = do
+        let newPartialEntity = partialEntity ++ show i
+        hostsCount <- getHostsCount
+            a
+            (hostsCountQueryFilteredByEntity newPartialEntity)
+        wait
+        retrievedEntities <- case () of
+            _
+                | hostsCount > 0 && hostsCount <= nrqlLimit -> do
+                    partialHosts <- getHosts
+                        a
+                        (hostsQueryFilteredByEntity newPartialEntity)
+                    wait
+                    persistHosts a time partialHosts
+                    return hostsCount
+                | hostsCount > nrqlLimit -> processAccountHostsPagination'
+                    a
+                    time
+                    total
+                    totalAcc
+                    newPartialEntity
+                    1
+                | otherwise -> return hostsCount
+        processAccountHostsPagination' a
+                                       time
+                                       total
+                                       (totalAcc + retrievedEntities)
+                                       partialEntity
+                                       (i + 1)

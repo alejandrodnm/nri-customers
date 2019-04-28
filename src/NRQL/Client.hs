@@ -32,6 +32,7 @@ import           Network.HTTP.Req               ( HttpResponseBody
                                                 , POST(POST)
                                                 , ReqBodyJson(ReqBodyJson)
                                                 , jsonResponse
+                                                , toVanillaResponse
                                                 , parseUrlHttp
                                                 , req
                                                 , responseBody
@@ -53,7 +54,8 @@ import           Types.Host                     ( Host(..)
                                                 , HostsCount(..)
                                                 )
 
-nrqlLimit = 5
+nrqlLimit :: Int
+nrqlLimit = 1000
 
 type ReqFormat = String
 
@@ -102,16 +104,31 @@ accountsQuery bottom top =
                     ++ (show . accNumber) top
     in  Query "uniques(account)" "ArchiveFile" where' "1 week ago"
 
-accountHostsCountQuery :: Query
-accountHostsCountQuery =
+hostsCountQuery :: Query
+hostsCountQuery =
     Query "uniqueCount(entityId)" "SystemSample" "true" "1 week ago"
 
-accountHostsQuery :: Query
-accountHostsQuery =
+hostsCountQueryFilteredByEntity :: String -> Query
+hostsCountQueryFilteredByEntity entityId =
+    let where' = "entityId like '" ++ entityId ++ "%'"
+    in  Query "uniqueCount(entityId)" "SystemSample" where' "1 week ago"
+
+hostsQuery :: Query
+hostsQuery =
     let
         select
             = "latest(linuxDistribution), latest(agentVersion), latest(kernelVersion), latest(instanceType), latest(operatingSystem), latest(windowsVersion), latest(windowsPlatform), latest(windowsFamily), latest(coreCount), latest(processorCount), latest(systemMemoryBytes)"
     in  Query select "SystemSample" "true facet entityId" "1 week ago"
+
+hostsQueryFilteredByEntity :: String -> Query
+hostsQueryFilteredByEntity entityId =
+    let
+        select
+            = "latest(linuxDistribution), latest(agentVersion), latest(kernelVersion), latest(instanceType), latest(operatingSystem), latest(windowsVersion), latest(windowsPlatform), latest(windowsFamily), latest(coreCount), latest(processorCount), latest(systemMemoryBytes)"
+        where' = "entityId like '" ++ entityId ++ "%' facet entityId"
+    in
+        Query select "SystemSample" where' "1 week ago"
+
 encodeQuery :: Query -> String
 encodeQuery (Query select from where' since) =
     "select "
@@ -122,7 +139,8 @@ encodeQuery (Query select from where' since) =
         ++ where'
         ++ " since "
         ++ since
-        ++ " limit 5"
+        ++ " limit "
+        ++ (show nrqlLimit)
 
 metaAccount :: Account
 metaAccount = Account 313870
@@ -188,12 +206,13 @@ getAccount f = do
     let account = responseBody r :: Account
     return account
 
-getAccountHostsCount
+getHostsCount
     :: (KatipContext m, MonadCatch m, MonadHttp m, MonadReader AppConfig m)
     => Account
-    -> m Integer
-getAccountHostsCount acc = do
-    let body = requestBody accountHostsCountQuery acc
+    -> Query
+    -> m Int
+getHostsCount acc query = do
+    let body = requestBody query acc
     r <- request body
     let hostsCount = hCount (responseBody r :: HostsCount)
     return hostsCount
@@ -201,12 +220,10 @@ getAccountHostsCount acc = do
 getHosts
     :: (KatipContext m, MonadCatch m, MonadHttp m, MonadReader AppConfig m)
     => Account
+    -> Query
     -> m Hosts
-getHosts acc = do
-    let body = requestBody accountHostsQuery acc
+getHosts acc query = do
+    let body = requestBody query acc
     r <- request body
-    let hosts     = responseBody r :: Hosts
-        accountId = fromInteger $ accNumber acc :: Int
-        addAccount :: Host -> Host
-        addAccount h = h { hostAccount = Just accountId }
-    return $ Hosts (addAccount <$> hList hosts)
+    let hosts = responseBody r :: Hosts
+    return hosts
