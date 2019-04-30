@@ -37,7 +37,6 @@ import           Katip                          ( Katip(..)
                                                 , runKatipT
                                                 )
 import           Katip.Instances.MonadLogger
-import           Logger                         ( LogEnv )
 import           Network.HTTP.Req               ( MonadHttp(..)
                                                 , HttpException
                                                 , Url
@@ -47,6 +46,9 @@ import           Network.HTTP.Req               ( MonadHttp(..)
 import           Network.Wai.Handler.Warp       ( Port )
 import           Servant                        ( ServantErr )
 import           Servant.Server                 ( Handler )
+
+import           Logger                         ( LogEnv )
+import           Network.HTTP.Req.Client        ( ReqClient )
 
 -- | The runtime environment
 data Environment
@@ -122,6 +124,8 @@ instance MonadIO m => KatipContext (DaemonT m)  where
 
 instance (MonadIO m, MonadThrow m) => MonadHttp (DaemonT m) where
     handleHttpException = throwM
+
+instance (MonadIO m, MonadThrow m, MonadCatch m) => ReqClient (DaemonT m)
 
 -- | Determine the number of connections in our @ConnectionPool@ based on the
 -- operating environment.
