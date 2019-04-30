@@ -18,6 +18,7 @@ import           Data.Time.Clock                ( UTCTime
                                                 )
 import           Database.Persist.Class         ( insertMany )
 import           Database.Persist.Types         ( Key )
+import           Network.HTTP.Req               ( responseBody )
 
 import           Config                         ( DaemonT )
 import           Logger                         ( Severity(..)
@@ -25,16 +26,17 @@ import           Logger                         ( Severity(..)
                                                 , logLocM
                                                 , logStr
                                                 )
-import           NRQL.Client                    ( ArchiveFunction(..)
-                                                , getAccount
-                                                , getHostsCount
+import           NRQL.Client                    ( runQuery
+                                                , metaAccount
+                                                )
+import           NRQL.Query                     ( ArchiveFunction(..)
                                                 , hostsCountQueryFilteredByEntity
                                                 , hostsCountQuery
                                                 , hostsQueryFilteredByEntity
                                                 , hostsQuery
-                                                , getAccounts
-                                                , getHosts
                                                 , nrqlLimit
+                                                , accountQuery
+                                                , accountsQuery
                                                 )
 import           Persist                        ( runDB )
 import           Types.Account                  ( Account(..)
@@ -42,6 +44,7 @@ import           Types.Account                  ( Account(..)
                                                 )
 import           Types.Host                     ( Hosts(hList)
                                                 , Host
+                                                , HostsCount(..)
                                                 , hostFromPartial
                                                 )
 
@@ -58,11 +61,15 @@ week = 7 * 24 * 3600 * 1000000
 pipeline :: DaemonT IO ()
 pipeline = do
 
-    minAccount <- getAccount Min
+    minAccount <- runQuery metaAccount
+                           (accountQuery Min)
+                           (\r -> responseBody r :: Account)
     logLocM DebugS (logStr $ "min account retrieved: " ++ show minAccount)
     wait
 
-    maxAccount <- getAccount Max
+    maxAccount <- runQuery metaAccount
+                           (accountQuery Max)
+                           (\r -> responseBody r :: Account)
     logLocM DebugS (logStr $ "max account retrieved: " ++ show maxAccount)
     wait
 
@@ -80,7 +87,9 @@ processAccounts max bottom time = do
         DebugS
         (logStr $ "starting pipeline from " ++ show bottom ++ " to " ++ show top
         )
-    accounts <- getAccounts bottom top
+    accounts <- runQuery metaAccount
+                         (accountsQuery bottom top)
+                         (\r -> responseBody r :: Accounts)
     wait
     processAccountHosts time accounts
     when (top < max) $ processAccounts max top time
@@ -88,12 +97,15 @@ processAccounts max bottom time = do
 processAccountHosts :: UTCTime -> Accounts -> DaemonT IO ()
 processAccountHosts _    (Accounts []      ) = return ()
 processAccountHosts time (Accounts (a : as)) = do
-    hostsCount <- getHostsCount a hostsCountQuery
+    hostsCount <- hCount
+        <$> runQuery a hostsCountQuery (\r -> responseBody r :: HostsCount)
     wait
     case () of
         _
             | hostsCount > 0 && hostsCount <= nrqlLimit -> do
-                partialHosts <- getHosts a hostsQuery
+                partialHosts <- runQuery a
+                                         hostsQuery
+                                         (\r -> responseBody r :: Hosts)
                 wait
                 persistHosts a time partialHosts
                 return hostsCount
@@ -120,16 +132,18 @@ processAccountHostsPagination' a time total totalAcc partialEntity i
     | i >= 10 = return totalAcc
     | otherwise = do
         let newPartialEntity = partialEntity ++ show i
-        hostsCount <- getHostsCount
+        hostsCount <- hCount <$> runQuery
             a
             (hostsCountQueryFilteredByEntity newPartialEntity)
+            (\r -> responseBody r :: HostsCount)
         wait
         retrievedEntities <- case () of
             _
                 | hostsCount > 0 && hostsCount <= nrqlLimit -> do
-                    partialHosts <- getHosts
+                    partialHosts <- runQuery
                         a
                         (hostsQueryFilteredByEntity newPartialEntity)
+                        (\r -> responseBody r :: Hosts)
                     wait
                     persistHosts a time partialHosts
                     return hostsCount

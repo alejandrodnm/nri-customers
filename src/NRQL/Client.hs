@@ -46,6 +46,9 @@ import           Logger                         ( KatipContext
                                                 , logLocM
                                                 , logStr
                                                 )
+import           NRQL.Query                     ( Query
+                                                , encodeQuery
+                                                )
 import           Types.Account                  ( Account(..)
                                                 , Accounts
                                                 )
@@ -53,23 +56,6 @@ import           Types.Host                     ( Host(..)
                                                 , Hosts(..)
                                                 , HostsCount(..)
                                                 )
-
-nrqlLimit :: Int
-nrqlLimit = 1000
-
-type ReqFormat = String
-
-data ArchiveFunction
-    = Min
-    | Max
-    | Uniques
-
-data Query = Query Select From Where Since deriving (Show)
-
-type Select = String
-type From = String
-type Where = String
-type Since = String
 
 data DiracRequest = DiracRequest
     { query       :: String
@@ -87,60 +73,6 @@ newtype DiracMetadata = DiracMetadata
 
 instance ToJSON DiracMetadata
 instance FromJSON DiracMetadata
-
-accountQuery :: ArchiveFunction -> Query
-accountQuery f =
-    let f' = case f of
-            Min -> "min(account)"
-            Max -> "max(account)"
-    in  Query f' "ArchiveFile" "storedEventType = 'SystemSample'" "1 week ago"
-
-accountsQuery :: Account -> Account -> Query
-accountsQuery bottom top =
-    let where' =
-                "storedEventType = 'SystemSample' AND account >= "
-                    ++ (show . accNumber) bottom
-                    ++ " AND account < "
-                    ++ (show . accNumber) top
-    in  Query "uniques(account)" "ArchiveFile" where' "1 week ago"
-
-hostsCountQuery :: Query
-hostsCountQuery =
-    Query "uniqueCount(entityId)" "SystemSample" "true" "1 week ago"
-
-hostsCountQueryFilteredByEntity :: String -> Query
-hostsCountQueryFilteredByEntity entityId =
-    let where' = "entityId like '" ++ entityId ++ "%'"
-    in  Query "uniqueCount(entityId)" "SystemSample" where' "1 week ago"
-
-hostsQuery :: Query
-hostsQuery =
-    let
-        select
-            = "latest(linuxDistribution), latest(agentVersion), latest(kernelVersion), latest(instanceType), latest(operatingSystem), latest(windowsVersion), latest(windowsPlatform), latest(windowsFamily), latest(coreCount), latest(processorCount), latest(systemMemoryBytes)"
-    in  Query select "SystemSample" "true facet entityId" "1 week ago"
-
-hostsQueryFilteredByEntity :: String -> Query
-hostsQueryFilteredByEntity entityId =
-    let
-        select
-            = "latest(linuxDistribution), latest(agentVersion), latest(kernelVersion), latest(instanceType), latest(operatingSystem), latest(windowsVersion), latest(windowsPlatform), latest(windowsFamily), latest(coreCount), latest(processorCount), latest(systemMemoryBytes)"
-        where' = "entityId like '" ++ entityId ++ "%' facet entityId"
-    in
-        Query select "SystemSample" where' "1 week ago"
-
-encodeQuery :: Query -> String
-encodeQuery (Query select from where' since) =
-    "select "
-        ++ select
-        ++ " from "
-        ++ from
-        ++ " where "
-        ++ where'
-        ++ " since "
-        ++ since
-        ++ " limit "
-        ++ show nrqlLimit
 
 metaAccount :: Account
 metaAccount = Account 313870
@@ -179,51 +111,18 @@ request body = do
             liftIO $ threadDelay 5000000
             request body
 
--- Retrieves the accounts resulting from applying the given function
-getAccounts
-    :: (KatipContext m, MonadCatch m, MonadHttp m, MonadReader AppConfig m)
-    => Account
-    -> Account
-    -> m Accounts
-getAccounts bottom top = do
-    -- Get the min and max account numbers
-    let query = accountsQuery bottom top
-        body  = requestBody query metaAccount
-    r <- request body
-    let accounts = responseBody r :: Accounts
-    return accounts
-
--- Retrieves the account resulting from applying the given function
-getAccount
-    :: (KatipContext m, MonadCatch m, MonadHttp m, MonadReader AppConfig m)
-    => ArchiveFunction
-    -> m Account
-getAccount f = do
-    -- Get the min and max account numbers
-    let query = accountQuery f
-        body  = requestBody query metaAccount
-    r <- request body
-    let account = responseBody r :: Account
-    return account
-
-getHostsCount
-    :: (KatipContext m, MonadCatch m, MonadHttp m, MonadReader AppConfig m)
+runQuery
+    :: ( KatipContext m
+       , MonadCatch m
+       , MonadHttp m
+       , MonadReader AppConfig m
+       , FromJSON a
+       )
     => Account
     -> Query
-    -> m Int
-getHostsCount acc query = do
+    -> (JsonResponse a -> a)
+    -> m a
+runQuery acc query f = do
     let body = requestBody query acc
     r <- request body
-    let hostsCount = hCount (responseBody r :: HostsCount)
-    return hostsCount
-
-getHosts
-    :: (KatipContext m, MonadCatch m, MonadHttp m, MonadReader AppConfig m)
-    => Account
-    -> Query
-    -> m Hosts
-getHosts acc query = do
-    let body = requestBody query acc
-    r <- request body
-    let hosts = responseBody r :: Hosts
-    return hosts
+    return $ f r
