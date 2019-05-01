@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE DataKinds                  #-}
@@ -8,6 +9,7 @@ module Config
     , DaemonT(..)
     , Environment(..)
     , makeDBPool
+    , Daemon
     )
 where
 
@@ -109,6 +111,10 @@ newtype DaemonT m a = DaemonT
         , MonadThrow
         , MonadCatch
         )
+
+class (MonadIO m, Monad m, MonadCatch m, MonadHttp m , MonadReader AppConfig m , ReqClient m) => Daemon m
+
+instance (MonadIO m, MonadThrow m, MonadCatch m) => Daemon (DaemonT m)
 
 instance MonadIO m => Katip (DaemonT m)  where
     getLogEnv   = asks cfgLogEnv

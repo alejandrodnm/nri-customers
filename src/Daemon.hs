@@ -20,7 +20,9 @@ import           Database.Persist.Class         ( insertMany )
 import           Database.Persist.Types         ( Key )
 import           Network.HTTP.Req               ( responseBody )
 
-import           Config                         ( DaemonT )
+import           Config                         ( DaemonT
+                                                , Daemon
+                                                )
 import           Logger                         ( Severity(..)
                                                 , katipAddNamespace
                                                 , logLocM
@@ -53,12 +55,12 @@ daemonLoop = katipAddNamespace "daemon" $ forever $ do
     pipeline
     liftIO $ threadDelay week
 
-wait :: DaemonT IO ()
+wait :: MonadIO m => m ()
 wait = liftIO $ threadDelay week
 
 week = 7 * 24 * 3600 * 1000000
 
-pipeline :: DaemonT IO ()
+pipeline :: (Daemon m) => m ()
 pipeline = do
 
     minAccount <- runQuery metaAccount
@@ -80,7 +82,7 @@ pipeline = do
 nextTop :: Account -> Account
 nextTop account = Account (accNumber account + nrqlLimit)
 
-processAccounts :: Account -> Account -> UTCTime -> DaemonT IO ()
+processAccounts :: Daemon m => Account -> Account -> UTCTime -> m ()
 processAccounts max bottom time = do
     let top = nextTop bottom
     logLocM
@@ -94,7 +96,7 @@ processAccounts max bottom time = do
     processAccountHosts time accounts
     when (top < max) $ processAccounts max top time
 
-processAccountHosts :: UTCTime -> Accounts -> DaemonT IO ()
+processAccountHosts :: Daemon m => UTCTime -> Accounts -> m ()
 processAccountHosts _    (Accounts []      ) = return ()
 processAccountHosts time (Accounts (a : as)) = do
     hostsCount <- hCount
@@ -116,17 +118,17 @@ processAccountHosts time (Accounts (a : as)) = do
             | otherwise -> return hostsCount
     processAccountHosts time (Accounts as)
 
-persistHosts :: Account -> UTCTime -> Hosts -> DaemonT IO [Key Host]
+persistHosts :: Daemon m => Account -> UTCTime -> Hosts -> m [Key Host]
 persistHosts a time partialHosts = do
     let hosts = hostFromPartial a time <$> hList partialHosts
     runDB (insertMany hosts)
 
-processAccountHostsPagination :: Account -> UTCTime -> Int -> DaemonT IO Int
+processAccountHostsPagination :: Daemon m => Account -> UTCTime -> Int -> m Int
 processAccountHostsPagination a time total =
     processAccountHostsPagination' a time total 0 "" 1
 
 processAccountHostsPagination'
-    :: Account -> UTCTime -> Int -> Int -> String -> Int -> DaemonT IO Int
+    :: Daemon m => Account -> UTCTime -> Int -> Int -> String -> Int -> m Int
 processAccountHostsPagination' a time total totalAcc partialEntity i
     | totalAcc >= total = return totalAcc
     | i >= 10 = return totalAcc

@@ -69,7 +69,6 @@ requestBody q acc = DiracRequest { query       = encodeQuery q
 
 runQuery
     :: ( KatipContext m
-       , MonadCatch m
        , MonadHttp m
        , MonadReader AppConfig m
        , FromJSON a
