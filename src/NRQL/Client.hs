@@ -14,13 +14,12 @@ import           Data.Aeson                     ( FromJSON
 import           Data.Either                    ( Either(..) )
 import           Data.List                      ( head )
 import           Data.Maybe                     ( fromMaybe )
+import           Data.Proxy
 import           Data.Typeable                  ( typeOf )
 import qualified Data.Vector                   as V
 import           GHC.Generics                   ( Generic )
 import           Network.HTTP.Req               ( JsonResponse
                                                 , MonadHttp
-                                                , parseUrlHttp
-                                                , req
                                                 )
 
 import           Config                         ( AppConfig
@@ -68,18 +67,17 @@ requestBody q acc = DiracRequest { query       = encodeQuery q
                                  }
 
 runQuery
-    :: ( KatipContext m
+    :: ( FromJSON response
+       , KatipContext m
        , MonadHttp m
        , MonadReader AppConfig m
-       , FromJSON a
        , ReqClient m
        )
-    => Account
+    => Proxy response
+    -> Account
     -> Query
-    -> (JsonResponse a -> a)
-    -> m a
-runQuery acc query f = do
+    -> m response
+runQuery proxy acc query = do
     let body = requestBody query acc
     (url, options) <- asks cfgNREndpoint
-    r              <- reqRequest url options body
-    return $ f r
+    reqRequest proxy url options body

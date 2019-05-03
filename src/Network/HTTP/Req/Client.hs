@@ -15,6 +15,7 @@ import           Data.Aeson                     ( FromJSON
                                                 , ToJSON
                                                 , encode
                                                 )
+import           Data.Proxy
 import           Network.HTTP.Req               ( JsonResponse
                                                 , MonadHttp
                                                 , POST(POST)
@@ -23,6 +24,8 @@ import           Network.HTTP.Req               ( JsonResponse
                                                 , Option
                                                 , jsonResponse
                                                 , req
+                                                , responseBody
+                                                , HttpResponseBody
                                                 )
 
 import           Logger                         ( KatipContext
@@ -32,27 +35,33 @@ import           Logger                         ( KatipContext
                                                 )
 
 class (KatipContext m, MonadHttp m, MonadCatch m, MonadIO m ) => (ReqClient m) where
-    reqRequest :: (ToJSON a, FromJSON b) => Url scheme -> Option scheme -> a -> m (JsonResponse b)
+    reqRequest :: (ToJSON a, FromJSON response) => Proxy response -> Url scheme -> Option scheme -> a -> m response
     reqRequest = request
 
 -- Executes a request with the given `DiracRequest`, in case of and
 -- error the request will be retried.
 request
-    :: forall a m b scheme
-     . (KatipContext m, MonadHttp m, MonadCatch m, FromJSON b, ToJSON a)
-    => Url scheme
+    :: forall a m b scheme response
+     . ( KatipContext m
+       , MonadHttp m
+       , MonadCatch m
+       , FromJSON response
+       , ToJSON a
+       )
+    => Proxy response
+    -> Url scheme
     -> Option scheme
     -> a
-    -> m (JsonResponse b)
-request url options body = do
+    -> m response
+request proxy url options body = do
     logLocM DebugS ((logStr . show . encode) body)
     r <-
         try $ req POST url (ReqBodyJson body) jsonResponse options :: m
-            (Either SomeException (JsonResponse b))
+            (Either SomeException (JsonResponse response))
     case r of
-        Right v -> return v
+        Right v -> return $ responseBody v
         Left  e -> do
             liftIO $ print e
             logLocM ErrorS ((logStr . show) e)
             liftIO $ threadDelay 5000000
-            request url options body
+            request proxy url options body

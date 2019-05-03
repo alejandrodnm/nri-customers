@@ -1,7 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Daemon
     ( daemonLoop
+    , pipeline
     )
 where
 
@@ -21,7 +20,7 @@ import           Database.Persist.Types         ( Key )
 import           Network.HTTP.Req               ( responseBody )
 
 import           Config                         ( DaemonT
-                                                , Daemon
+                                                , Daemon(..)
                                                 )
 import           Logger                         ( Severity(..)
                                                 , katipAddNamespace
@@ -43,35 +42,33 @@ import           NRQL.Query                     ( ArchiveFunction(..)
 import           Persist                        ( runDB )
 import           Types.Account                  ( Account(..)
                                                 , Accounts(..)
+                                                , accountP
+                                                , accountsP
                                                 )
 import           Types.Host                     ( Hosts(hList)
                                                 , Host
                                                 , HostsCount(..)
                                                 , hostFromPartial
+                                                , hostsCountP
+                                                , hostsP
                                                 )
+import           Data.Proxy
 
 daemonLoop :: DaemonT IO ()
 daemonLoop = katipAddNamespace "daemon" $ forever $ do
     pipeline
     liftIO $ threadDelay week
 
-wait :: MonadIO m => m ()
-wait = liftIO $ threadDelay week
-
 week = 7 * 24 * 3600 * 1000000
 
-pipeline :: (Daemon m) => m ()
+pipeline :: Daemon m => m ()
 pipeline = do
 
-    minAccount <- runQuery metaAccount
-                           (accountQuery Min)
-                           (\r -> responseBody r :: Account)
+    minAccount <- runQuery accountP metaAccount (accountQuery Min)
     logLocM DebugS (logStr $ "min account retrieved: " ++ show minAccount)
     wait
 
-    maxAccount <- runQuery metaAccount
-                           (accountQuery Max)
-                           (\r -> responseBody r :: Account)
+    maxAccount <- runQuery accountP metaAccount (accountQuery Max)
     logLocM DebugS (logStr $ "max account retrieved: " ++ show maxAccount)
     wait
 
@@ -89,9 +86,7 @@ processAccounts max bottom time = do
         DebugS
         (logStr $ "starting pipeline from " ++ show bottom ++ " to " ++ show top
         )
-    accounts <- runQuery metaAccount
-                         (accountsQuery bottom top)
-                         (\r -> responseBody r :: Accounts)
+    accounts <- runQuery accountsP metaAccount (accountsQuery bottom top)
     wait
     processAccountHosts time accounts
     when (top < max) $ processAccounts max top time
@@ -99,15 +94,12 @@ processAccounts max bottom time = do
 processAccountHosts :: Daemon m => UTCTime -> Accounts -> m ()
 processAccountHosts _    (Accounts []      ) = return ()
 processAccountHosts time (Accounts (a : as)) = do
-    hostsCount <- hCount
-        <$> runQuery a hostsCountQuery (\r -> responseBody r :: HostsCount)
+    hostsCount <- hCount <$> runQuery hostsCountP a hostsCountQuery
     wait
     case () of
         _
             | hostsCount > 0 && hostsCount <= nrqlLimit -> do
-                partialHosts <- runQuery a
-                                         hostsQuery
-                                         (\r -> responseBody r :: Hosts)
+                partialHosts <- runQuery hostsP a hostsQuery
                 wait
                 persistHosts a time partialHosts
                 return hostsCount
@@ -135,17 +127,17 @@ processAccountHostsPagination' a time total totalAcc partialEntity i
     | otherwise = do
         let newPartialEntity = partialEntity ++ show i
         hostsCount <- hCount <$> runQuery
+            hostsCountP
             a
             (hostsCountQueryFilteredByEntity newPartialEntity)
-            (\r -> responseBody r :: HostsCount)
         wait
         retrievedEntities <- case () of
             _
                 | hostsCount > 0 && hostsCount <= nrqlLimit -> do
                     partialHosts <- runQuery
+                        hostsP
                         a
                         (hostsQueryFilteredByEntity newPartialEntity)
-                        (\r -> responseBody r :: Hosts)
                     wait
                     persistHosts a time partialHosts
                     return hostsCount

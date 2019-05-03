@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE DataKinds                  #-}
 
 module Config
@@ -9,10 +8,11 @@ module Config
     , DaemonT(..)
     , Environment(..)
     , makeDBPool
-    , Daemon
+    , Daemon(..)
     )
 where
 
+import           Control.Concurrent             ( threadDelay )
 import           Control.Monad.Catch            ( MonadThrow
                                                 , MonadCatch
                                                 , throwM
@@ -20,7 +20,9 @@ import           Control.Monad.Catch            ( MonadThrow
 import           Control.Exception              ( throwIO )
 import           Control.Monad.Except           ( MonadError )
 import           Control.Monad.Trans.Class      ( lift )
-import           Control.Monad.IO.Class         ( MonadIO )
+import           Control.Monad.IO.Class         ( MonadIO
+                                                , liftIO
+                                                )
 import           Data.ByteString                ( ByteString )
 import           Control.Monad.Reader           ( MonadReader
                                                 , ReaderT
@@ -40,7 +42,6 @@ import           Katip                          ( Katip(..)
                                                 )
 import           Katip.Instances.MonadLogger
 import           Network.HTTP.Req               ( MonadHttp(..)
-                                                , HttpException
                                                 , Url
                                                 , Option
                                                 , Scheme(Http)
@@ -112,9 +113,11 @@ newtype DaemonT m a = DaemonT
         , MonadCatch
         )
 
-class (MonadIO m, Monad m, MonadCatch m, MonadHttp m , MonadReader AppConfig m , ReqClient m) => Daemon m
+class (MonadIO m, Monad m, MonadCatch m, MonadReader AppConfig m , ReqClient m) => Daemon m where
+    wait :: m ()
 
-instance (MonadIO m, MonadThrow m, MonadCatch m) => Daemon (DaemonT m)
+instance (MonadIO m, MonadThrow m, MonadCatch m) => Daemon (DaemonT m) where
+    wait = liftIO $ threadDelay 1000000
 
 instance MonadIO m => Katip (DaemonT m)  where
     getLogEnv   = asks cfgLogEnv

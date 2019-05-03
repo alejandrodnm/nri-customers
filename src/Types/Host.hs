@@ -4,6 +4,8 @@ module Types.Host
     , PartialHost(..)
     , HostsCount(..)
     , hostFromPartial
+    , hostsCountP
+    , hostsP
     )
 where
 
@@ -19,8 +21,9 @@ import           Data.Foldable                  ( fold )
 import           Data.Monoid                    ( Sum(..)
                                                 , getSum
                                                 )
+import           Data.Proxy
 import           Data.Text                      ( Text )
-import Data.Time.Clock (UTCTime)
+import           Data.Time.Clock                ( UTCTime )
 import           Data.Traversable               ( sequenceA )
 import qualified Data.Vector                   as V
 import           Text.Read                      ( readMaybe )
@@ -35,6 +38,9 @@ import           NRQL.Aeson                     ( foldParsers
 newtype Hosts = Hosts {
         hList :: [PartialHost]
     } deriving(Show, Eq)
+
+hostsP :: Proxy Hosts
+hostsP = Proxy
 
 data PartialHost = PartialHost
     { entityId :: Text
@@ -102,19 +108,22 @@ instance FromJSON HostsCount where
         r <- responseResults o
         HostsCount <$> foldParsers (accountFromResults r <$> ["uniqueCount"])
 
+hostsCountP :: Proxy HostsCount
+hostsCountP = Proxy
+
 hostFromPartial :: Account -> UTCTime -> PartialHost -> Host
 hostFromPartial a time ph = Host { hostEntityId          = entityId ph
-                            , hostAccount           = accNumber a
-                            , hostLinuxDistribution = linuxDistribution ph
-                            , hostAgentVersion      = agentVersion ph
-                            , hostKernelVersion     = kernelVersion ph
-                            , hostInstanceType      = instanceType ph
-                            , hostOperatingSystem   = operatingSystem ph
-                            , hostWindowsVersion    = windowsVersion ph
-                            , hostWindowsPlatform   = windowsPlatform ph
-                            , hostWindowsFamily     = windowsFamily ph
-                            , hostCoreCount         = coreCount ph
-                            , hostProcessorCount    = processorCount ph
-                            , hostSystemMemoryBytes = systemMemoryBytes ph
-                            , hostCreated           = time
-                            }
+                                 , hostAccount           = accNumber a
+                                 , hostLinuxDistribution = linuxDistribution ph
+                                 , hostAgentVersion      = agentVersion ph
+                                 , hostKernelVersion     = kernelVersion ph
+                                 , hostInstanceType      = instanceType ph
+                                 , hostOperatingSystem   = operatingSystem ph
+                                 , hostWindowsVersion    = windowsVersion ph
+                                 , hostWindowsPlatform   = windowsPlatform ph
+                                 , hostWindowsFamily     = windowsFamily ph
+                                 , hostCoreCount         = coreCount ph
+                                 , hostProcessorCount    = processorCount ph
+                                 , hostSystemMemoryBytes = systemMemoryBytes ph
+                                 , hostCreated           = time
+                                 }

@@ -1,6 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
-
-module NRQLSpec where
+module Types.AccountSpec where
 
 import           Control.Monad.Catch            ( SomeException )
 import           Control.Monad.Reader           ( runReaderT )
@@ -12,15 +10,6 @@ import           Test.Hspec
 import           Config
 import           Types.Account
 import           Types.Host
--- config :: AppConfig
--- config = AppConfig { cfgLogEnv       = undefined
---                    , cfgLogContext   = undefined
---                    , cfgLogNamespace = undefined
---                    , cfgPort         = undefined
---                    , cfgEnv          = undefined
---                    , cfgDBPool       = undefined
---                    , cfgNREndpoint   = "nr.com"
---                    }
 
 spec :: Spec
 spec = do
