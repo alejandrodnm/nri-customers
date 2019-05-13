@@ -1,7 +1,7 @@
 module NRQL.Aeson
     ( foldParsers
     , responseResults
-    , accountFromResults
+    , fromResults
     )
 where
 
@@ -32,8 +32,8 @@ responseResults v = case v of
             _       -> fail "array of results expected"
     _ -> fail "root object expected"
 
-accountFromResults :: (FromJSON b) => V.Vector Value -> Text -> Parser (Maybe b)
-accountFromResults v f = case length v of
+fromResults :: (FromJSON b) => V.Vector Value -> Text -> Parser (Maybe b)
+fromResults v f = case length v of
     0 -> fail "results array from query is empty"
     _ -> case V.head v of
         Object m -> m .:? f

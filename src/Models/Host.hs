@@ -15,7 +15,7 @@
 module Models.Host where
 
 import           Data.Text                      ( Text )
-import Data.Time.Clock (UTCTime)
+import           Data.Time.Clock                ( UTCTime )
 import           Database.Persist.TH            ( mkMigrate
                                                 , mkPersist
                                                 , persistLowerCase
@@ -26,7 +26,7 @@ import           Database.Persist.TH            ( mkMigrate
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     Host
-        entityId Text
+        entityId          Text
         account           Int
         linuxDistribution String Maybe
         agentVersion      String Maybe

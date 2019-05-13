@@ -32,7 +32,7 @@ import           Models.Host                    ( Host(..) )
 import           Types.Account                  ( Account(..) )
 import           NRQL.Aeson                     ( foldParsers
                                                 , responseResults
-                                                , accountFromResults
+                                                , fromResults
                                                 )
 
 newtype Hosts = Hosts {
@@ -106,7 +106,7 @@ newtype HostsCount = HostsCount {
 instance FromJSON HostsCount where
     parseJSON o = do
         r <- responseResults o
-        HostsCount <$> foldParsers (accountFromResults r <$> ["uniqueCount"])
+        HostsCount <$> foldParsers (fromResults r <$> ["uniqueCount"])
 
 hostsCountP :: Proxy HostsCount
 hostsCountP = Proxy

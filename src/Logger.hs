@@ -55,6 +55,7 @@ data LogState = MyState {
 
 defaultLogEnv :: Show a => a -> IO LogEnv
 defaultLogEnv env = do
+    -- TODO: Set severity by env
     handleScribe <- mkHandleScribe ColorIfTerminal stdout DebugS V2
     env          <- initLogEnv "nri-customers" (toEnv env)
     registerScribe "stdout" handleScribe defaultScribeSettings env

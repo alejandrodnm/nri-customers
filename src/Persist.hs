@@ -21,11 +21,10 @@ import           Database.Persist.Postgresql    ( ConnectionPool
                                                 , runMigration
                                                 , runSqlPool
                                                 )
--- import qualified Models.Agent                  as A
-import qualified Models.Host                   as A
+import qualified Models.Host                   as H
 
 migrate :: ConnectionPool -> IO ()
-migrate = runSqlPool $ runMigration A.migrateAll
+migrate = runSqlPool $ runMigration H.migrateAll
 
 runDB :: (MonadReader AppConfig m, MonadIO m) => SqlPersistT IO a -> m a
 runDB query = do

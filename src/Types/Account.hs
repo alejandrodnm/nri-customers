@@ -7,7 +7,7 @@ import           Data.Proxy
 
 import           NRQL.Aeson                     ( foldParsers
                                                 , responseResults
-                                                , accountFromResults
+                                                , fromResults
                                                 )
 
 newtype Accounts = Accounts {
@@ -17,7 +17,7 @@ newtype Accounts = Accounts {
 instance FromJSON Accounts where
     parseJSON o = do
         r           <- responseResults o
-        rawAccounts <- foldParsers (accountFromResults r <$> ["members"])
+        rawAccounts <- foldParsers (fromResults r <$> ["members"])
         return $ Accounts (Account <$> rawAccounts)
 
 accountsP :: Proxy Accounts
@@ -33,7 +33,7 @@ instance ToJSON Account where
 instance FromJSON Account where
     parseJSON o = do
         r <- responseResults o
-        Account <$> foldParsers (accountFromResults r <$> ["min", "max"])
+        Account <$> foldParsers (fromResults r <$> ["min", "max"])
 
 accountP :: Proxy Account
 accountP = Proxy

@@ -9,6 +9,7 @@ module Config
     , Environment(..)
     , makeDBPool
     , Daemon(..)
+    , getConnectionStr
     )
 where
 
@@ -146,6 +147,9 @@ getConnectionStr :: Environment -> IO ConnectionString
 getConnectionStr Development =
     pure
         "host=localhost port=5432 user=postgres password=postgres dbname=nricustomers"
+getConnectionStr Test =
+    pure
+        "host=localhost port=5432 user=postgres password=postgres dbname=nricustomerstest"
 
 makeDBPool :: Environment -> LogEnv -> IO ConnectionPool
 makeDBPool env logEnv = do
