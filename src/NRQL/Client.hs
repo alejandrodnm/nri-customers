@@ -3,29 +3,19 @@
 
 module NRQL.Client where
 
-import           Control.Concurrent             ( threadDelay )
-import           Control.Monad.Catch            ( MonadCatch )
 import           Control.Monad.Reader           ( MonadReader
                                                 , asks
                                                 )
 import           Data.Aeson                     ( FromJSON
                                                 , ToJSON
                                                 )
-import           Data.Either                    ( Either(..) )
-import           Data.List                      ( head )
-import           Data.Maybe                     ( fromMaybe )
 import           Data.Proxy
 import           Data.Typeable                  ( typeOf )
-import qualified Data.Vector                   as V
 import           GHC.Generics                   ( Generic )
-import           Network.HTTP.Req               ( JsonResponse
-                                                , MonadHttp
-                                                )
 
 import           Config                         ( AppConfig
                                                 , cfgNREndpoint
                                                 )
-import           Logger                         ( KatipContext )
 import           Network.HTTP.Req.Client        ( ReqClient(..) )
 import           NRQL.Query                     ( Query
                                                 , encodeQuery
@@ -67,12 +57,7 @@ requestBody q acc = DiracRequest { query       = encodeQuery q
                                  }
 
 runQuery
-    :: ( FromJSON response
-       , KatipContext m
-       , MonadHttp m
-       , MonadReader AppConfig m
-       , ReqClient m
-       )
+    :: (FromJSON response, MonadReader AppConfig m, ReqClient m)
     => Proxy response
     -> Account
     -> Query
