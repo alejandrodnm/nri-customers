@@ -38,8 +38,8 @@ class (KatipContext m, MonadHttp m, MonadCatch m, MonadIO m ) => (ReqClient m) w
     reqRequest :: (ToJSON a, FromJSON response) => Proxy response -> Url scheme -> Option scheme -> a -> m response
     reqRequest = request
 
--- Executes a request with the given `DiracRequest`, in case of and
--- error the request will be retried.
+-- Executes a request with the given `DiracRequest`, in case of an error
+-- the request will be retried.
 request
     :: forall a m b scheme response
      . ( KatipContext m
