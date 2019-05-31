@@ -18,6 +18,10 @@ Keeping in mind that this is a learning exercise, the plan is to mock the
 web server database calls using a free monad instead of the already
 tried typeclass approach.
 
+*NOTE* As this thing grew, I didn't pay much attention to file structure and a 
+lot is bundled in the `src/Config.hs` file. Again this is mostly a learning 
+exercise for Haskell concepts and libraries.
+
 ## Resources:
 
 - https://haskell-servant.readthedocs.io/en/stable/index.html
