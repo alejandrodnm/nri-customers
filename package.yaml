@@ -50,6 +50,8 @@ dependencies:
 - vector == 0.12.0.2
 - time == 1.8.0.2
 - unliftio-core == 0.1.2.0
+- free == 5.1
+- esqueleto == 3.0.0
 
 library:
   source-dirs: src

@@ -5,8 +5,8 @@ module Api
     )
 where
 
-import           Api.Agent                      ( AgentAPI
-                                                , agentAPI
+import           Api.Host                       ( HostAPI
+                                                , hostAPI
                                                 )
 import           Api.Dirac                      ( DiracAPI
                                                 , diracAPI
@@ -27,10 +27,10 @@ import           Servant.Server                 ( Handler(Handler)
                                                 )
 
 
-type AppAPI = AgentAPI :<|> DiracAPI
+type AppAPI = HostAPI :<|> DiracAPI
 
 appServer :: ServerT AppAPI AppM
-appServer = agentAPI :<|> diracAPI
+appServer = hostAPI :<|> diracAPI
 
 hoistedAppServer :: AppConfig -> Server AppAPI
 hoistedAppServer cfg = hoistServer appAPI (appToHandler cfg) appServer

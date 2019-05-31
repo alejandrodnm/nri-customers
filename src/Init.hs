@@ -40,6 +40,7 @@ import           Logger                         ( LogEnv
                                                 , waiLogMiddleware
                                                 )
 import           Persist                        ( migrate )
+import           Repo                           ( interpret )
 
 
 -- | Returns a default warp settings but with localhost as host
@@ -53,9 +54,9 @@ runApp = bracket getConfig shutdown runApp'
     runApp' :: AppConfig -> IO ()
     runApp' config = do
         let logEnv = cfgLogEnv config
-        forkIO $ do
-            runLoggerWithMsg logEnv "daemon" "starting daemon"
-            runReaderT (runDaemonT daemonLoop) config
+        -- forkIO $ do
+        --     runLoggerWithMsg logEnv "daemon" "starting daemon"
+        --     runReaderT (runDaemonT daemonLoop) config
         runLoggerWithMsg logEnv "main" "starting web server"
         runSettings (warpSettings $ cfgPort config)
                     (waiLogMiddleware logEnv $ app config)
@@ -68,13 +69,14 @@ getConfig = do
     endpoint <- lookupStringSetting "NR_ENDPOINT" "http://localhost:8000/dirac"
     dbPool   <- makeDBPool env logEnv
     migrate dbPool
-    return AppConfig { cfgEnv          = env
-                     , cfgLogEnv       = logEnv
-                     , cfgLogContext   = mempty
-                     , cfgLogNamespace = mempty
-                     , cfgPort         = port
-                     , cfgDBPool       = dbPool
-                     , cfgNREndpoint   = parseURL endpoint
+    return AppConfig { cfgEnv             = env
+                     , cfgLogEnv          = logEnv
+                     , cfgLogContext      = mempty
+                     , cfgLogNamespace    = mempty
+                     , cfgPort            = port
+                     , cfgDBPool          = dbPool
+                     , cfgNREndpoint      = parseURL endpoint
+                     , cfgRepoInterpreter = interpret
                      }
 
 parseURL :: String -> (Url Http, Option b)

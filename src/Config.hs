@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Config
     ( AppConfig(..)
@@ -10,26 +12,30 @@ module Config
     , makeDBPool
     , Daemon(..)
     , getConnectionStr
+    , Repo
+    , RepoF(..)
     )
 where
 
 import           Control.Concurrent             ( threadDelay )
+import           Control.Exception              ( throwIO )
 import           Control.Monad.Catch            ( MonadThrow
                                                 , MonadCatch
                                                 , throwM
                                                 )
-import           Control.Exception              ( throwIO )
+
 import           Control.Monad.Except           ( MonadError )
+import           Control.Monad.Free             ( Free(Free, Pure) )
 import           Control.Monad.Trans.Class      ( lift )
 import           Control.Monad.IO.Class         ( MonadIO
                                                 , liftIO
                                                 )
-import           Data.ByteString                ( ByteString )
 import           Control.Monad.Reader           ( MonadReader
                                                 , ReaderT
                                                 , asks
                                                 , local
                                                 )
+import           Data.ByteString                ( ByteString )
 import           Database.Persist.Postgresql    ( ConnectionPool
                                                 , ConnectionString
                                                 , createPostgresqlPool
@@ -53,6 +59,7 @@ import           Servant.Server                 ( Handler )
 
 import           Logger                         ( LogEnv )
 import           Network.HTTP.Req.Client        ( ReqClient )
+import           Types.Host                     ( Host )
 
 -- | The runtime environment
 data Environment
@@ -99,6 +106,7 @@ data AppConfig = AppConfig
     , cfgEnv          :: Environment
     , cfgDBPool       :: ConnectionPool
     , cfgNREndpoint   :: (Url Http, Option Http)
+    , cfgRepoInterpreter :: forall r. Repo r -> AppM r
     }
 
 -- | This type represents the effect for the daemon application
@@ -155,3 +163,10 @@ makeDBPool :: Environment -> LogEnv -> IO ConnectionPool
 makeDBPool env logEnv = do
     connStr <- getConnectionStr env
     runKatipT logEnv $ createPostgresqlPool connStr (getPoolSize env)
+
+data RepoF next
+    = GetHosts ([Host] -> next)
+    | Done next
+    deriving Functor
+
+type Repo = Free RepoF

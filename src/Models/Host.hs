@@ -25,7 +25,7 @@ import           Database.Persist.TH            ( mkMigrate
                                                 )
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
-    Host
+    Host json
         entityId          Text
         account           Int
         linuxDistribution String Maybe

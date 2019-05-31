@@ -27,7 +27,7 @@ import qualified Data.ByteString.Lazy          as BL
 import           Data.Maybe                     ( fromJust )
 import           Data.Proxy
 import           Data.Word                      ( Word8 )
-import           Database.Persist (entityVal)
+import           Database.Persist               ( entityVal )
 import           Database.Persist.Sql           ( (==.) )
 import           Database.Persist.Postgresql    ( selectFirst
                                                 , toSqlKey
@@ -61,13 +61,14 @@ mockConfig = do
     logEnv <- defaultLogEnv env
     dbPool <- makeDBPool env logEnv
     migrate dbPool
-    return AppConfig { cfgEnv          = env
-                     , cfgLogEnv       = logEnv
-                     , cfgLogContext   = mempty
-                     , cfgLogNamespace = mempty
-                     , cfgPort         = undefined
-                     , cfgDBPool       = dbPool
-                     , cfgNREndpoint   = endpoint
+    return AppConfig { cfgEnv             = env
+                     , cfgLogEnv          = logEnv
+                     , cfgLogContext      = mempty
+                     , cfgLogNamespace    = mempty
+                     , cfgPort            = undefined
+                     , cfgDBPool          = dbPool
+                     , cfgNREndpoint      = endpoint
+                     , cfgRepoInterpreter = undefined
                      }
 -- | This type represents the effect for the daemon application
 newtype MockDaemonT m a = MockDaemonT
@@ -130,7 +131,7 @@ mockedRequestPayload body
 
 spec :: Spec
 spec = before_ flushDB $ context "Run daemon" $ it "executes correctly" $ do
-    r <- runReaderT (runMockDaemonT pipeline) =<< mockConfig
+    r     <- runReaderT (runMockDaemonT pipeline) =<< mockConfig
     mHost <- runDBQuery $ selectFirst [HostEntityId ==. "974205676942181148"] []
     -- TODO better assertions
     (hostEntityId $ entityVal $ fromJust mHost) `shouldBe` "974205676942181148"
