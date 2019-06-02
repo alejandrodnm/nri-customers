@@ -52,6 +52,9 @@ dependencies:
 - unliftio-core == 0.1.2.0
 - free == 5.1
 - esqueleto == 3.0.0
+- hspec-wai == 0.9.0
+- servant-client == 0.15
+- http-client == 0.5.14
 
 library:
   source-dirs: src

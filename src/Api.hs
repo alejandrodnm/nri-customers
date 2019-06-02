@@ -1,9 +1,6 @@
 {-# LANGUAGE TypeOperators #-}
 
-module Api
-    ( app
-    )
-where
+module Api where
 
 import           Api.Host                       ( HostAPI
                                                 , hostAPI

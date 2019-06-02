@@ -70,6 +70,7 @@ mockConfig = do
                      , cfgNREndpoint      = endpoint
                      , cfgRepoInterpreter = undefined
                      }
+
 -- | This type represents the effect for the daemon application
 newtype MockDaemonT m a = MockDaemonT
     { runMockDaemonT :: ReaderT AppConfig m a

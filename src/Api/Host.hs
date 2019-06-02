@@ -8,6 +8,7 @@ module Api.Host
 where
 
 import           Control.Monad.IO.Class         ( liftIO )
+import           Control.Monad.Reader           ( asks )
 import           Data.Int                       ( Int64 )
 import           Logger                         ( Severity(..)
                                                 , katipAddContext
@@ -27,10 +28,10 @@ import           Servant                        ( (:<|>)((:<|>))
                                                 , throwError
                                                 )
 
-import           Config                         ( AppM )
-import           Repo                           ( retrieveHosts
-                                                , interpret
+import           Config                         ( AppM
+                                                , AppConfig(cfgRepoInterpreter)
                                                 )
+import           Repo                           ( retrieveHosts )
 
 type HostAPI = "hosts" :> Get '[JSON] [Host]
 
@@ -40,4 +41,5 @@ hostAPI = hosts
 hosts :: AppM [Host]
 hosts = do
     logLocM DebugS "requested hosts"
-    interpret retrieveHosts
+    repoInterpreter <- asks cfgRepoInterpreter
+    repoInterpreter retrieveHosts

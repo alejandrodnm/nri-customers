@@ -51,6 +51,7 @@ data DiracRequest = DiracRequest
     } deriving(Generic, Show)
 
 instance FromJSON DiracRequest
+instance ToJSON DiracRequest
 
 type DiracAPI = "dirac" :> ReqBody '[JSON] DiracRequest :> Post '[JSON] Value
 

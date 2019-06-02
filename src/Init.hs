@@ -54,9 +54,9 @@ runApp = bracket getConfig shutdown runApp'
     runApp' :: AppConfig -> IO ()
     runApp' config = do
         let logEnv = cfgLogEnv config
-        -- forkIO $ do
-        --     runLoggerWithMsg logEnv "daemon" "starting daemon"
-        --     runReaderT (runDaemonT daemonLoop) config
+        forkIO $ do
+            runLoggerWithMsg logEnv "daemon" "starting daemon"
+            runReaderT (runDaemonT daemonLoop) config
         runLoggerWithMsg logEnv "main" "starting web server"
         runSettings (warpSettings $ cfgPort config)
                     (waiLogMiddleware logEnv $ app config)
